@@ -41,4 +41,4 @@ GPU command: `gpu_cmd_valid/gpu_cmd_ready`, `gpu_cmd_opcode[7:0]`, `gpu_cmd_job_
 
 ## Status
 
-This is the first implementation milestone. Run the provided simulation locally and review the TODOs/issues before treating the design as production-quality IP. Test results are not claimed unless you run the test yourself.
+This is the first implementation milestone. Run the provided simulation locally and review the TODOs/issues before treating the design as production-quality IP. 

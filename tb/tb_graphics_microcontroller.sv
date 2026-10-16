@@ -13,8 +13,9 @@ module tb_graphics_microcontroller;
   logic gpu_cmd_valid, gpu_cmd_ready, gpu_busy, gpu_done, gpu_error;
   logic [7:0] gpu_cmd_opcode;
   logic [15:0] gpu_cmd_job_id;
+  logic dma_req_valid, dma_req_ready, dma_rsp_valid, dma_rsp_error, dma_busy;
+  logic [31:0] dma_src_addr, dma_dst_addr, dma_length;
   logic irq;
-  logic dma_req_valid, dma_req_ready, dma_rsp_valid, dma_rsp_error, dma_busy;\n  logic [31:0] dma_src_addr, dma_dst_addr, dma_length;
 
   graphics_microcontroller dut (.*);
 
@@ -48,6 +49,9 @@ module tb_graphics_microcontroller;
     gpu_busy = 1'b0;
     gpu_done = 1'b0;
     gpu_error = 1'b0;
+    dma_req_ready = 1'b0;
+    dma_rsp_valid = 1'b0;
+    dma_rsp_error = 1'b0;
     repeat (3) @(posedge clk);
     rst_n = 1'b1;
 
@@ -56,7 +60,33 @@ module tb_graphics_microcontroller;
 
     host_access(1'b1, 8'h00, 32'h0000_0005, response);
     host_access(1'b1, 8'h0C, 32'h0000_1234, response);
+    host_access(1'b1, 8'h1C, 32'h0000_1000, response);
+    host_access(1'b1, 8'h20, 32'h0000_2000, response);
+    host_access(1'b1, 8'h24, 32'h0000_0040, response);
     host_access(1'b1, 8'h08, 32'h0000_0002, response);
+
+    // A job submission automatically launches DMA. The request must remain
+    // stable until accepted, and GPU dispatch must wait for DMA success.
+    wait (dma_req_valid);
+    if (dma_src_addr !== 32'h1000 || dma_dst_addr !== 32'h2000 ||
+        dma_length !== 32'h40) $fatal(1, "DMA descriptor fields incorrect");
+    repeat (2) begin
+      @(posedge clk);
+      if (!dma_req_valid || dma_src_addr !== 32'h1000 ||
+          dma_dst_addr !== 32'h2000 || dma_length !== 32'h40)
+        $fatal(1, "DMA request changed under backpressure");
+    end
+
+    @(negedge clk);
+    dma_req_ready = 1'b1;
+    @(posedge clk);
+    @(negedge clk);
+    dma_req_ready = 1'b0;
+    dma_rsp_valid = 1'b1;
+    dma_rsp_error = 1'b0;
+    @(posedge clk);
+    @(negedge clk);
+    dma_rsp_valid = 1'b0;
 
     wait (gpu_cmd_valid);
     if (gpu_cmd_opcode !== 8'h02) $fatal(1, "Unexpected command opcode");
@@ -90,7 +120,7 @@ module tb_graphics_microcontroller;
     host_access(1'b0, 8'h18, 32'b0, response);
     if (response[0] !== 1'b1) $fatal(1, "Invalid opcode did not set error");
 
-    $display("PASS: GMC directed smoke test");
+    $display("PASS: GMC DMA-to-GPU smoke test");
     $finish;
   end
 endmodule

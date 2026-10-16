@@ -1,7 +1,7 @@
 VERILATOR ?= verilator
 TOP       := tb_graphics_microcontroller
 BUILD_DIR := build
-RTL       := ../rtl/command_fifo.sv ../rtl/graphics_microcontroller.sv
+RTL       := ../rtl/command_fifo.sv ../rtl/dma_interface.sv ../rtl/graphics_microcontroller.sv
 TB        := ../tb/tb_graphics_microcontroller.sv
 
 .PHONY: all lint test clean

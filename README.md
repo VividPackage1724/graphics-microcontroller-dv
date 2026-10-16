@@ -9,7 +9,7 @@ An original, educational SystemVerilog project for a small graphics-command micr
 - 32-bit host register interface with 8-bit byte addresses
 - 8-entry command FIFO
 - 8-entry job FIFO with per-job source/destination/length snapshots
-- DMA request/response sequencer with timeout-free single-outstanding handshake
+- DMA request/response sequencer with a single-outstanding handshake
 - Command dispatch interface to a simulated GPU engine
 - Completion/error interrupt status
 - Register read/write, invalid-command, FIFO-full, and reset behavior

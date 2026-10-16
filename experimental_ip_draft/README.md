@@ -9,7 +9,7 @@ This folder contains an educational, synthesizable SystemVerilog prototype for a
 3. The job controller dequeues and validates one descriptor.
 4. The controller launches DMA with source address, destination address, and length. The external DMA endpoint must accept the request with `dma_req_valid && dma_req_ready`, perform the entire transfer, and return exactly one response using `dma_rsp_valid && dma_rsp_ready`. `dma_rsp_error` marks a failed transfer.
 5. The job controller dispatches the engine command only after a successful DMA response. It waits for `engine_done` or `engine_error`.
-6. Completion/error status and interrupt events are generated. DMA request backpressure, DMA response timeout, engine timeout, and DMA/engine errors terminate the active job without dispatching after a failed DMA.
+6. Completion/error status and interrupt events are generated. DMA request backpressure, DMA response timeout, engine timeout, and DMA/engine errors terminate the active job without dispatching after a failed DMA. A response timeout after request acceptance also pulses `dma_cancel` to request cancellation of the outstanding transfer.
 
 The DMA request fields remain stable while `dma_req_valid` is asserted and `dma_req_ready` is low. A response must correspond to the single outstanding DMA request. This prototype supports one active job and one outstanding DMA operation; it does not define burst splitting, cache coherency, address translation, or memory protection.
 
@@ -32,7 +32,7 @@ Zero-length descriptors are rejected. Address alignment and address-range checks
 - Treat one accepted command as a complete source-to-destination transfer of `dma_req_length` bytes.
 - Keep the request ready/valid protocol independent from response timing; the response can arrive only after the request is accepted.
 - Return one response for each accepted command. Assert `dma_rsp_error` for a transfer failure.
-- If no response arrives before the configured timeout, the controller aborts the job logically. The external DMA endpoint must not later associate a stale response with a new request; production integration should add transaction IDs or a defined cancellation/reset contract.
+- If no response arrives before the configured timeout, the controller pulses `dma_cancel` and aborts the job logically. The endpoint must cancel the outstanding transfer and must not return a late response for that request. The endpoint must honor this cancellation contract; if cancellation cannot be guaranteed, add transaction IDs and stale-response filtering before production integration.
 
 ## Files
 

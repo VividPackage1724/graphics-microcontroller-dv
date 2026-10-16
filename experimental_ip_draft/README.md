@@ -1,36 +1,49 @@
-# GPU Command & Job Controller — experimental RTL draft
+# GPU Command Controller RTL — Experimental Draft
 
-This directory contains an early RTL prototype for a reusable GPU/AI accelerator command controller.
+This folder contains an educational, synthesizable SystemVerilog prototype for a host-submitted command/job controller. It is not production-ready IP. The RTL has not yet been formally verified or qualified for a target ASIC/FPGA flow.
 
-## RTL files
+## Integrated job data flow
 
-- rtl/command_fifo.sv — parameterized FIFO with ready/valid flow control.
-- rtl/command_decoder.sv — fixed-format descriptor validation.
-- rtl/register_bank.sv — simple host MMIO interface and descriptor submission.
-- rtl/interrupt_controller.sv — sticky completion/error interrupt status.
-- rtl/job_controller.sv — single-active-job dispatch and timeout.
-- rtl/dma_interface.sv — single-outstanding DMA request/response wrapper.
-- rtl/gpu_command_controller.sv — top-level integration.
+1. The host programs opcode, job ID, source address, destination address, and transfer length through the simple request/ready register interface.
+2. A write to `ADDR_SUBMIT` pushes a 128-bit descriptor into the command FIFO.
+3. The job controller dequeues and validates one descriptor.
+4. The controller launches DMA with source address, destination address, and length. The external DMA endpoint must accept the request with `dma_req_valid && dma_req_ready`, perform the entire transfer, and return exactly one response using `dma_rsp_valid && dma_rsp_ready`. `dma_rsp_error` marks a failed transfer.
+5. The job controller dispatches the engine command only after a successful DMA response. It waits for `engine_done` or `engine_error`.
+6. Completion/error status and interrupt events are generated. DMA request backpressure, DMA response timeout, engine timeout, and DMA/engine errors terminate the active job without dispatching after a failed DMA.
+
+The DMA request fields remain stable while `dma_req_valid` is asserted and `dma_req_ready` is low. A response must correspond to the single outstanding DMA request. This prototype supports one active job and one outstanding DMA operation; it does not define burst splitting, cache coherency, address translation, or memory protection.
 
 ## Descriptor format
 
 | Bits | Field |
 |---|---|
-| [7:0] | Opcode; 8'h02 means SUBMIT_JOB |
-| [23:8] | Job ID |
-| [55:24] | Source address |
-| [87:56] | Destination address |
-| [103:88] | Length in bytes |
-| [127:104] | Reserved; must be zero |
+| [7:0] | opcode; `8'h02` means DMA-assisted job |
+| [23:8] | job ID |
+| [55:24] | source address |
+| [87:56] | destination address |
+| [103:88] | transfer length in bytes |
+| [127:104] | reserved; must be zero |
 
-## Integration notes
+Zero-length descriptors are rejected. Address alignment and address-range checks are not implemented.
 
-The host interface is a custom request/ready interface and is not AXI-Lite compliant.
+## DMA endpoint contract
 
-The DMA interface is instantiated at the top level but remains an auxiliary, independently started transaction port in this draft. A submitted job does not automatically trigger DMA. Connecting job descriptors to DMA execution requires a separately specified dataflow and completion contract.
+- Accept a command only on `dma_req_valid && dma_req_ready`.
+- Treat one accepted command as a complete source-to-destination transfer of `dma_req_length` bytes.
+- Keep the request ready/valid protocol independent from response timing; the response can arrive only after the request is accepted.
+- Return one response for each accepted command. Assert `dma_rsp_error` for a transfer failure.
+- If no response arrives before the configured timeout, the controller aborts the job logically. The external DMA endpoint must not later associate a stale response with a new request; production integration should add transaction IDs or a defined cancellation/reset contract.
 
-The FIFO uses a conservative full policy: it does not accept a push in the same cycle as a pop when it starts full.
+## Files
 
-## Verification status
+- `rtl/command_fifo.sv` — descriptor FIFO
+- `rtl/command_decoder.sv` — descriptor field extraction and basic validation
+- `rtl/register_bank.sv` — host register interface
+- `rtl/dma_interface.sv` — DMA command/response handshake and timeout
+- `rtl/job_controller.sv` — descriptor validation, DMA sequencing, engine dispatch, and job timeout
+- `rtl/interrupt_controller.sv` — completion/error interrupt status
+- `rtl/gpu_command_controller.sv` — integrated top level
 
-This is an unverified draft, not production-qualified IP. Run lint/elaboration and self-checking simulation before relying on it. Review timeout boundary conditions, reset and abort semantics, descriptor constraints, bus handshakes, and interrupt-clear/event priority. No claim of compatibility with any specific commercial GPU or SoC is made.
+## Verification still required
+
+Compile and elaborate all RTL together; add a self-checking testbench for FIFO backpressure, descriptor rejection, DMA request stalls, successful DMA-before-engine ordering, DMA error, DMA timeout, engine error/timeout, interrupt clearing, and reset during each state. Add assertions for request stability, no engine dispatch before DMA completion, and one completion/error outcome per accepted descriptor.

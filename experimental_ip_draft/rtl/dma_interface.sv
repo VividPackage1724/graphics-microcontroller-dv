@@ -25,7 +25,8 @@ module dma_interface #(
 
     output logic        busy,
     output logic        done_pulse,
-    output logic        error_pulse
+    output logic        error_pulse,
+    output logic        cancel_pulse
 );
     localparam int TIMER_WIDTH =
         (TIMEOUT_CYCLES <= 1) ? 1 : $clog2(TIMEOUT_CYCLES + 1);
@@ -54,9 +55,11 @@ module dma_interface #(
             length_reg <= '0;
             done_pulse <= 1'b0;
             error_pulse <= 1'b0;
+            cancel_pulse <= 1'b0;
         end else begin
             done_pulse <= 1'b0;
             error_pulse <= 1'b0;
+            cancel_pulse <= 1'b0;
 
             case (state)
                 DMA_IDLE: begin
@@ -92,6 +95,7 @@ module dma_interface #(
                         timeout_count <= '0;
                     end else if (timeout_count >= TIMEOUT_CYCLES - 1) begin
                         error_pulse <= 1'b1;
+                        cancel_pulse <= 1'b1;
                         state <= DMA_IDLE;
                         timeout_count <= '0;
                     end else begin

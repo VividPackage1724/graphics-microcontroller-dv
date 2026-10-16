@@ -26,14 +26,12 @@ module gpu_command_controller #(
     input  logic         engine_done,
     input  logic         engine_error,
 
-    // Auxiliary DMA port: jobs do not auto-start DMA in this draft.
-    input  logic         dma_start_valid,
-    output logic         dma_start_ready,
-    input  logic [31:0]  dma_start_addr,
-    input  logic [15:0]  dma_start_length,
+    // External DMA command/response interface.
+    // One accepted request represents a complete src->dst transfer of length bytes.
     output logic         dma_req_valid,
     input  logic         dma_req_ready,
-    output logic [31:0]  dma_req_addr,
+    output logic [31:0]  dma_req_src_addr,
+    output logic [31:0]  dma_req_dst_addr,
     output logic [15:0]  dma_req_length,
     input  logic         dma_rsp_valid,
     output logic         dma_rsp_ready,
@@ -54,6 +52,10 @@ module gpu_command_controller #(
     logic [15:0] active_job_id;
     logic [1:0] irq_enable, irq_clear;
     logic status_error;
+
+    logic dma_start_valid, dma_start_ready;
+    logic [31:0] dma_start_src_addr, dma_start_dst_addr;
+    logic [15:0] dma_start_length;
 
     assign busy = job_busy | dma_busy;
     assign status_error = job_error | dma_error;
@@ -81,6 +83,11 @@ module gpu_command_controller #(
         .clk(clk), .rst_n(rst_n),
         .fifo_valid(fifo_out_valid), .fifo_ready(fifo_out_ready),
         .fifo_descriptor(fifo_out_descriptor),
+        .dma_start_valid(dma_start_valid), .dma_start_ready(dma_start_ready),
+        .dma_start_src_addr(dma_start_src_addr),
+        .dma_start_dst_addr(dma_start_dst_addr),
+        .dma_start_length(dma_start_length),
+        .dma_done(dma_done), .dma_error(dma_error),
         .engine_cmd_valid(engine_cmd_valid), .engine_cmd_ready(engine_cmd_ready),
         .engine_opcode(engine_opcode), .engine_job_id(engine_job_id),
         .engine_src_addr(engine_src_addr), .engine_dst_addr(engine_dst_addr),
@@ -93,9 +100,11 @@ module gpu_command_controller #(
     dma_interface #(.TIMEOUT_CYCLES(DMA_TIMEOUT_CYCLES)) u_dma_interface (
         .clk(clk), .rst_n(rst_n),
         .start_valid(dma_start_valid), .start_ready(dma_start_ready),
-        .start_addr(dma_start_addr), .start_length(dma_start_length),
+        .start_src_addr(dma_start_src_addr), .start_dst_addr(dma_start_dst_addr),
+        .start_length(dma_start_length),
         .dma_req_valid(dma_req_valid), .dma_req_ready(dma_req_ready),
-        .dma_req_addr(dma_req_addr), .dma_req_length(dma_req_length),
+        .dma_req_src_addr(dma_req_src_addr), .dma_req_dst_addr(dma_req_dst_addr),
+        .dma_req_length(dma_req_length),
         .dma_rsp_valid(dma_rsp_valid), .dma_rsp_ready(dma_rsp_ready),
         .dma_rsp_error(dma_rsp_error), .busy(dma_busy),
         .done_pulse(dma_done), .error_pulse(dma_error)

@@ -39,6 +39,7 @@ module gpu_command_controller #(
     output logic         dma_busy,
     output logic         dma_done,
     output logic         dma_error,
+    output logic         dma_cancel,
 
     output logic         busy,
     output logic         irq,
@@ -107,7 +108,7 @@ module gpu_command_controller #(
         .dma_req_length(dma_req_length),
         .dma_rsp_valid(dma_rsp_valid), .dma_rsp_ready(dma_rsp_ready),
         .dma_rsp_error(dma_rsp_error), .busy(dma_busy),
-        .done_pulse(dma_done), .error_pulse(dma_error)
+        .done_pulse(dma_done), .error_pulse(dma_error), .cancel_pulse(dma_cancel)
     );
 
     interrupt_controller u_interrupt_controller (

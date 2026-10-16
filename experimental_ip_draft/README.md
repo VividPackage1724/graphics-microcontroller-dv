@@ -1,14 +1,16 @@
 # GPU Command & Job Controller — experimental RTL draft
 
-This directory contains an early, unverified RTL draft for a reusable GPU/AI accelerator command controller.
+This directory contains an early RTL prototype for a reusable GPU/AI accelerator command controller.
 
-## Files
+## RTL files
 
-- `rtl/command_decoder.sv`: fixed-format descriptor validation.
-- `rtl/register_bank.sv`: simple host MMIO interface and descriptor submission.
-- `rtl/interrupt_controller.sv`: sticky completion/error status.
-- `rtl/job_controller.sv`: single-active-job dispatch and timeout.
-- `rtl/dma_interface.sv`: single-outstanding DMA request/response wrapper.
+- rtl/command_fifo.sv — parameterized FIFO with ready/valid flow control.
+- rtl/command_decoder.sv — fixed-format descriptor validation.
+- rtl/register_bank.sv — simple host MMIO interface and descriptor submission.
+- rtl/interrupt_controller.sv — sticky completion/error interrupt status.
+- rtl/job_controller.sv — single-active-job dispatch and timeout.
+- rtl/dma_interface.sv — single-outstanding DMA request/response wrapper.
+- rtl/gpu_command_controller.sv — top-level integration.
 
 ## Descriptor format
 
@@ -21,10 +23,14 @@ This directory contains an early, unverified RTL draft for a reusable GPU/AI acc
 | [103:88] | Length in bytes |
 | [127:104] | Reserved; must be zero |
 
-## Important limitations
+## Integration notes
 
-This is a draft, not production-qualified IP. It has not been compiled or simulated as part of this commit. It requires lint, self-checking tests, and interface-contract review before integration.
+The host interface is a custom request/ready interface and is not AXI-Lite compliant.
 
-The register bank uses a simple custom host request/ready interface; it is not AXI-Lite compliant. The DMA module is a single-transaction wrapper, not a full DMA engine. Reset/abort semantics and timeout behavior must be specified and verified before production use.
+The DMA interface is instantiated at the top level but remains an auxiliary, independently started transaction port in this draft. A submitted job does not automatically trigger DMA. Connecting job descriptors to DMA execution requires a separately specified dataflow and completion contract.
 
-No claim of compatibility with a specific GPU or commercial SoC is made.
+The FIFO uses a conservative full policy: it does not accept a push in the same cycle as a pop when it starts full.
+
+## Verification status
+
+This is an unverified draft, not production-qualified IP. Run lint/elaboration and self-checking simulation before relying on it. Review timeout boundary conditions, reset and abort semantics, descriptor constraints, bus handshakes, and interrupt-clear/event priority. No claim of compatibility with any specific commercial GPU or SoC is made.

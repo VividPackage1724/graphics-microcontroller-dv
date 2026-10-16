@@ -14,6 +14,7 @@ module tb_graphics_microcontroller;
   logic [7:0] gpu_cmd_opcode;
   logic [15:0] gpu_cmd_job_id;
   logic irq;
+  logic dma_req_valid, dma_req_ready, dma_rsp_valid, dma_rsp_error, dma_busy;\n  logic [31:0] dma_src_addr, dma_dst_addr, dma_length;
 
   graphics_microcontroller dut (.*);
 
